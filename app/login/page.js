@@ -15,8 +15,8 @@ export default function LoginPage() {
     setIsLoading(true);
 
     // Dummy credentials
-    const dummyEmail = "admin@skilluence.com";
-    const dummyPassword = "demo123";
+    const dummyEmail = "support@skilluence.com";
+    const dummyPassword = "Skill@123";
 
     // Simple validation
     if (!email || !password) {
