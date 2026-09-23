@@ -43,37 +43,16 @@ export default function LoginPage() {
 
   return (
     <div className="login-page">
-      <div className="login-card">
-        <section className="login-brand">
-          <div className="login-brand-glow" />
-          <Image
-            src="/logo-authentic-scaled.png"
-            alt="Skilluence"
-            width={150}
-            height={52}
-            className="login-brand-logo"
-          />
-          <h2>Land your next role in the U.S.</h2>
-          <p>
-            Real, live-searched openings from LinkedIn and top employers —
-            filtered for visa-friendly, international-talent hiring.
-          </p>
-          <ul className="login-brand-points">
-            <li>Thousands of active roles, updated continuously</li>
-            <li>H-1B, OPT, TN &amp; Green Card friendly filters</li>
-            <li>No fake postings — sourced directly, not scraped from ads</li>
-          </ul>
-        </section>
-
-        <section className="login-form-side">
+      <section className="login-form-side">
+        <div className="login-form-inner">
           <div className="login-form-head">
-            <h1>Welcome back</h1>
-            <p>Sign in to search the job board</p>
+            <h1>Login to your account</h1>
+            <p>Enter your email below to login to your account.</p>
           </div>
 
           <form onSubmit={handleSubmit} noValidate>
             <div className="field">
-              <label htmlFor="email">Email address</label>
+              <label htmlFor="email">Email</label>
               <div className="input-wrap">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M4 6h16v12H4z" strokeLinejoin="round" />
@@ -127,6 +106,10 @@ export default function LoginPage() {
               </div>
             </div>
 
+            {message && (
+              <div className={`form-message ${isError ? "is-error" : "is-success"}`}>{message}</div>
+            )}
+
             <button type="submit" className="submit-btn" disabled={isLoading}>
               {isLoading ? (
                 <>
@@ -137,140 +120,111 @@ export default function LoginPage() {
                   Signing in…
                 </>
               ) : (
-                "Sign in"
+                <>
+                  Login
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M5 12h14M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </>
               )}
             </button>
           </form>
+        </div>
+      </section>
 
-          {message && (
-            <div className={`form-message ${isError ? "is-error" : "is-success"}`}>{message}</div>
-          )}
-
-          <div className="demo-hint">
-            <strong>Demo credentials</strong>
-            <div className="demo-hint-row">
-              <span>{DUMMY_EMAIL}</span>
-              <span>{DUMMY_PASSWORD}</span>
-            </div>
-          </div>
-
-          <a href="/" className="back-link">
-            &larr; Back to home
-          </a>
-        </section>
-      </div>
+      <section className="login-brand">
+        <Image
+          src="/logo-authentic-scaled.png"
+          alt="Skilluence"
+          width={160}
+          height={56}
+          className="login-brand-logo"
+        />
+        <div className="login-brand-copy">
+          <h2>Find your next role.</h2>
+          <p>
+            Real, live-searched openings from LinkedIn and top employers —
+            filtered for visa-friendly, international-talent hiring.
+          </p>
+        </div>
+        <p className="login-brand-footer">&copy; 2026 Skilluence. All rights reserved.</p>
+      </section>
 
       <style jsx>{`
         .login-page {
           min-height: 100vh;
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 8px;
+          padding: 8px;
+          background: var(--white);
+        }
+
+        .login-form-side {
           display: flex;
           align-items: center;
           justify-content: center;
-          padding: 24px;
-          background:
-            radial-gradient(600px circle at 15% 20%, rgba(57, 126, 209, 0.12), transparent 60%),
-            radial-gradient(500px circle at 85% 85%, rgba(57, 126, 209, 0.08), transparent 60%),
-            var(--bg-color);
+          padding: 40px 24px;
         }
 
-        .login-card {
+        .login-form-inner {
           width: 100%;
-          max-width: 880px;
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          background: var(--white);
-          border-radius: 24px;
-          overflow: hidden;
-          box-shadow: 0 30px 60px -20px rgba(15, 23, 42, 0.25), var(--shadow-card);
+          max-width: 360px;
+        }
+
+        .login-form-head h1 {
+          font-size: 24px;
+          font-weight: 600;
+          letter-spacing: -0.01em;
+          color: var(--text-main);
+          margin: 0 0 8px;
+        }
+
+        .login-form-head p {
+          font-size: 14px;
+          color: var(--text-muted);
+          margin: 0 0 28px;
         }
 
         .login-brand {
           position: relative;
-          padding: 48px 40px;
-          background: linear-gradient(160deg, var(--primary) 0%, var(--primary-dark) 100%);
+          border-radius: 24px;
+          padding: 40px;
+          background: var(--text-main);
           color: white;
           display: flex;
           flex-direction: column;
-          justify-content: center;
+          justify-content: space-between;
           overflow: hidden;
-        }
-
-        .login-brand-glow {
-          position: absolute;
-          width: 320px;
-          height: 320px;
-          border-radius: 50%;
-          background: rgba(255, 255, 255, 0.08);
-          top: -120px;
-          right: -100px;
-          pointer-events: none;
         }
 
         .login-brand-logo {
           object-fit: contain;
           filter: brightness(0) invert(1);
-          margin-bottom: 28px;
         }
 
-        .login-brand h2 {
-          font-size: 26px;
-          font-weight: 700;
-          line-height: 1.3;
-          margin: 0 0 12px;
+        .login-brand-copy {
+          max-width: 380px;
         }
 
-        .login-brand p {
-          font-size: 15px;
-          line-height: 1.6;
-          color: rgba(255, 255, 255, 0.85);
-          margin: 0 0 24px;
+        .login-brand-copy h2 {
+          font-size: 34px;
+          font-weight: 600;
+          line-height: 1.25;
+          margin: 0 0 14px;
         }
 
-        .login-brand-points {
-          list-style: none;
-          padding: 0;
-          margin: 0;
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-        }
-
-        .login-brand-points li {
+        .login-brand-copy p {
           font-size: 14px;
-          color: rgba(255, 255, 255, 0.92);
-          padding-left: 24px;
-          position: relative;
+          line-height: 1.6;
+          color: rgba(255, 255, 255, 0.65);
+          margin: 0;
         }
 
-        .login-brand-points li::before {
-          content: "";
-          position: absolute;
-          left: 0;
-          top: 6px;
-          width: 14px;
-          height: 14px;
-          border-radius: 50%;
-          background: rgba(255, 255, 255, 0.18);
-          box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.7);
-        }
-
-        .login-form-side {
-          padding: 48px 40px;
-          display: flex;
-          flex-direction: column;
-        }
-
-        .login-form-head h1 {
-          font-size: 26px;
-          font-weight: 700;
-          color: var(--text-main);
-          margin: 0 0 6px;
-        }
-
-        .login-form-head p {
-          font-size: 15px;
-          color: var(--text-muted);
-          margin: 0 0 28px;
+        .login-brand-footer {
+          font-size: 12px;
+          color: rgba(255, 255, 255, 0.45);
+          margin: 0;
         }
 
         .field {
@@ -398,58 +352,20 @@ export default function LoginPage() {
           border: 1px solid var(--primary-light);
         }
 
-        .demo-hint {
-          margin-top: 24px;
-          padding: 12px 14px;
-          border-radius: 10px;
-          background: var(--bg-color);
-          border: 1px dashed var(--border-color);
-          font-size: 12px;
+        .submit-btn svg {
+          width: 16px;
+          height: 16px;
         }
 
-        .demo-hint strong {
-          display: block;
-          color: var(--text-muted);
-          font-weight: 600;
-          margin-bottom: 6px;
-          text-transform: uppercase;
-          letter-spacing: 0.04em;
-          font-size: 11px;
-        }
-
-        .demo-hint-row {
-          display: flex;
-          justify-content: space-between;
-          gap: 12px;
-          font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-          color: var(--text-main);
-        }
-
-        .back-link {
-          margin-top: 20px;
-          text-align: center;
-          font-size: 13px;
-          color: var(--text-muted);
-          text-decoration: none;
-        }
-
-        .back-link:hover {
-          color: var(--primary);
-        }
-
-        @media (max-width: 760px) {
-          .login-card {
+        @media (max-width: 900px) {
+          .login-page {
             grid-template-columns: 1fr;
-            max-width: 440px;
           }
           .login-brand {
-            padding: 32px 28px;
-          }
-          .login-brand h2 {
-            font-size: 21px;
+            display: none;
           }
           .login-form-side {
-            padding: 32px 28px;
+            padding: 40px 24px;
           }
         }
       `}</style>
