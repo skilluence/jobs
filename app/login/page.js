@@ -161,6 +161,7 @@ export default function LoginPage() {
         }
 
         .login-form-side {
+          order: 2;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -187,6 +188,7 @@ export default function LoginPage() {
         }
 
         .login-brand {
+          order: 1;
           position: relative;
           border-radius: 24px;
           padding: 40px;
