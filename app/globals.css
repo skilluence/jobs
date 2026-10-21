@@ -326,3 +326,19 @@ input:-webkit-autofill, input:-webkit-autofill:hover, input:-webkit-autofill:foc
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
+
+/* Small inline spinner shown inside the search buttons while a search runs. */
+.btn-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-right: 8px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  vertical-align: -2px;
+  animation: spin 0.7s linear infinite;
+}
+.search-btn:disabled, .hero-btn-primary:disabled { cursor: progress; opacity: 0.85; transform: none; }
+.results-loading-more { display: inline-flex; align-items: center; margin-left: 10px; color: var(--primary); font-size: 13px; }
+.results-loading-more .btn-spinner { width: 12px; height: 12px; margin-right: 6px; }

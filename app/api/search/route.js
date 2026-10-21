@@ -12,6 +12,9 @@ import { searchLinkedIn } from "@/lib/sources/linkedin";
 const APIFY_TOKEN = process.env.APIFY_API_TOKEN;
 const ACTOR_RUN_URL = "https://api.apify.com/v2/acts/fantastic-jobs~advanced-linkedin-job-search-api/runs";
 const DATASET_ITEMS_BASE_URL = "https://api.apify.com/v2/datasets";
+const DEFAULT_MAX_AGE_HOURS = 24;
+const LINKEDIN_PAGES_PER_ROUND = 3; // ~10 jobs per page
+const MAX_ROUND = 9; // hard cap: at most 30 LinkedIn pages per search
 
 async function waitForRun(runId) {
   for (let i = 0; i < 25; i++) {
@@ -74,14 +77,27 @@ export async function POST(request) {
   if (!query) {
     return NextResponse.json({ error: "Missing query parameter." }, { status: 400 });
   }
+  // Freshness window in hours (default: last 24 h, capped at 7 days).
+  const maxAgeHours = Math.min(Math.max(Number(body?.maxAgeHours) || DEFAULT_MAX_AGE_HOURS, 1), 168);
+  // The client loads results in rounds: round 0 hits every source, later
+  // rounds only fetch the next LinkedIn pages (the ATS boards and Apify have
+  // no paging, so they'd just repeat).
+  const round = Math.min(Math.max(Math.floor(Number(body?.round) || 0), 0), MAX_ROUND);
+  const firstRound = round === 0;
 
   // Each source fails independently (Promise.allSettled) — one source being
   // down or rate-limited shouldn't take out the whole search the way a
   // single Apify failure used to.
   const [linkedinResult, atsResult, apifyResult] = await Promise.allSettled([
-    searchLinkedIn({ query, location: "United States", pages: 3 }),
-    sweepAts(COMPANIES, query),
-    APIFY_TOKEN ? searchApify(query) : Promise.resolve([]),
+    searchLinkedIn({
+      query,
+      location: "United States",
+      pages: LINKEDIN_PAGES_PER_ROUND,
+      startPage: round * LINKEDIN_PAGES_PER_ROUND + 1,
+      maxAgeHours,
+    }),
+    firstRound ? sweepAts(COMPANIES, query) : Promise.resolve([]),
+    firstRound && APIFY_TOKEN ? searchApify(query) : Promise.resolve([]),
   ]);
 
   const items = [];
@@ -101,9 +117,23 @@ export async function POST(request) {
     console.error("Apify source failed:", apifyResult.reason);
   }
 
-  if (items.length === 0) {
-    return NextResponse.json({ error: `No results found for "${query}".`, items: [] });
+  // Only keep postings from the last `maxAgeHours`, newest first. Items with
+  // no usable date are dropped — we can't tell they're fresh.
+  const cutoff = Date.now() - maxAgeHours * 3600 * 1000;
+  const fresh = items
+    .map((item) => ({ item, t: Date.parse(item.date_posted) }))
+    .filter(({ t }) => Number.isFinite(t) && t >= cutoff)
+    .sort((a, b) => b.t - a.t)
+    .map(({ item }) => item);
+
+  // More pages are worth asking for only while LinkedIn keeps returning
+  // fresh jobs and we're under the round cap.
+  const linkedinCount = linkedinResult.status === "fulfilled" ? linkedinResult.value.length : 0;
+  const hasMore = linkedinCount > 0 && round < MAX_ROUND;
+
+  if (fresh.length === 0 && firstRound) {
+    return NextResponse.json({ error: `No jobs posted in the last ${maxAgeHours} hours for "${query}".`, items: [] });
   }
 
-  return NextResponse.json({ items, meta: { count: items.length } });
+  return NextResponse.json({ items: fresh, meta: { count: fresh.length, maxAgeHours, round, hasMore } });
 }

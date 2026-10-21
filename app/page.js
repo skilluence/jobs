@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import jobs from "../data/jobs";
 
 const ITEMS_PER_PAGE = 10;
@@ -227,6 +227,24 @@ function Pagination({ currentPage, totalPages, onPageChange }) {
   );
 }
 
+const TARGET_JOB_COUNT = 100;
+
+function normalizeJob(job) {
+  return {
+    id: job.id || job.jobId || job.url || `${job.title}-${Math.random()}`,
+    title: job.title || job.jobName || "Job opening",
+    organization: job.organization || job.company || "Company",
+    organizationLogo: job.organization_logo || job.organizationLogo || "",
+    datePosted: job.date_posted || job.datePosted || new Date().toISOString(),
+    locations: (job.locations_derived && job.locations_derived[0]) || job.locations || "United States",
+    employmentType: Array.isArray(job.employment_type) ? job.employment_type[0] : job.employment_type || "FULL_TIME",
+    aiExperienceLevel: job.ai_experience_level || job.seniority || "Mid-Senior level",
+    aiWorkArrangement: job.ai_work_arrangement || job.work_arrangement || "Remote",
+    aiKeySkills: job.ai_key_skills || ["AI", "Machine Learning", "Data"],
+    descriptionHtml: job.description_html || job.description || "<p>No job description available.</p>",
+  };
+}
+
 export default function HomePage() {
   const [query, setQuery] = useState("");
   const [jobsData, setJobsData] = useState(jobs);
@@ -236,51 +254,80 @@ export default function HomePage() {
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [openCategory, setOpenCategory] = useState("location");
 
+  const [loadingMore, setLoadingMore] = useState(false);
+  // Bumped on every new search so a still-running background loop from the
+  // previous search knows to stop instead of mixing in stale results.
+  const searchIdRef = useRef(0);
+
   const enrichedJobs = useMemo(() => jobsData.map(enrichJob), [jobsData]);
 
+  const fetchRound = async (searchQuery, round) => {
+    const res = await fetch("/api/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query: searchQuery, round }),
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) {
+      throw new Error(data.error || "Search failed.");
+    }
+    return {
+      items: (Array.isArray(data.items) ? data.items : []).map(normalizeJob),
+      hasMore: Boolean(data.meta?.hasMore),
+    };
+  };
+
+  // Show the first round as soon as it lands, then keep fetching further
+  // rounds in the background — appending jobs and updating the count — until
+  // there are TARGET_JOB_COUNT+ jobs or the source runs out of fresh ones.
   const handleSearch = async (searchTerm) => {
     const searchQuery = searchTerm.trim() || "AI";
+    const searchId = ++searchIdRef.current;
     setLoading(true);
+    setLoadingMore(false);
     setError("");
     setCurrentPage(1);
 
+    let collected = [];
+    let hasMore = false;
     try {
-      const res = await fetch("/api/search", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: searchQuery }),
-      });
-
-      const data = await res.json();
-      if (!res.ok || data.error) {
-        throw new Error(data.error || "Search failed.");
-      }
-
-      const results = Array.isArray(data.items) && data.items.length > 0 ? data.items : [];
-      if (results.length === 0) {
+      const first = await fetchRound(searchQuery, 0);
+      if (searchId !== searchIdRef.current) return;
+      if (first.items.length === 0) {
         setError(`No results found for "${searchQuery}".`);
         setJobsData(jobs);
-      } else {
-        const normalizedJobs = results.map((job) => ({
-          id: job.id || job.jobId || job.url || `${job.title}-${Math.random()}`,
-          title: job.title || job.jobName || "Job opening",
-          organization: job.organization || job.company || "Company",
-          organizationLogo: job.organization_logo || job.organizationLogo || "",
-          datePosted: job.date_posted || job.datePosted || new Date().toISOString(),
-          locations: (job.locations_derived && job.locations_derived[0]) || job.locations || "United States",
-          employmentType: Array.isArray(job.employment_type) ? job.employment_type[0] : job.employment_type || "FULL_TIME",
-          aiExperienceLevel: job.ai_experience_level || job.seniority || "Mid-Senior level",
-          aiWorkArrangement: job.ai_work_arrangement || job.work_arrangement || "Remote",
-          aiKeySkills: job.ai_key_skills || ["AI", "Machine Learning", "Data"],
-          descriptionHtml: job.description_html || job.description || "<p>No job description available.</p>",
-        }));
-        setJobsData(normalizedJobs);
+        return;
       }
+      collected = first.items;
+      hasMore = first.hasMore;
+      setJobsData(collected);
     } catch (err) {
+      if (searchId !== searchIdRef.current) return;
       setError(err.message || "Unable to fetch jobs.");
       setJobsData(jobs);
+      return;
     } finally {
-      setLoading(false);
+      if (searchId === searchIdRef.current) setLoading(false);
+    }
+
+    if (!hasMore || collected.length >= TARGET_JOB_COUNT) return;
+    setLoadingMore(true);
+    const seen = new Set(collected.map((job) => job.id));
+    try {
+      for (let round = 1; hasMore && collected.length < TARGET_JOB_COUNT; round++) {
+        const next = await fetchRound(searchQuery, round);
+        if (searchId !== searchIdRef.current) return;
+        const added = next.items.filter((job) => !seen.has(job.id));
+        added.forEach((job) => seen.add(job.id));
+        if (added.length === 0) break;
+        collected = [...collected, ...added];
+        setJobsData(collected);
+        hasMore = next.hasMore;
+      }
+    } catch {
+      // Keep what we already have; background rounds are best-effort.
+    } finally {
+      if (searchId === searchIdRef.current) setLoadingMore(false);
     }
   };
 
@@ -515,7 +562,8 @@ export default function HomePage() {
           OPT, TN &amp; Green Cards — built for international talent.
         </p>
         <div className="hero-cta-row">
-          <button className="hero-btn-primary" onClick={() => handleSearch(query)}>
+          <button className="hero-btn-primary" onClick={() => handleSearch(query)} disabled={loading} aria-busy={loading}>
+            {loading && <span className="btn-spinner" aria-hidden="true" />}
             Search Jobs
           </button>
           <button
@@ -581,8 +629,9 @@ export default function HomePage() {
                   if (event.key === "Enter") handleSearch(query);
                 }}
               />
-              <button className="btn btn-primary search-btn" onClick={() => handleSearch(query)}>
-                Search
+              <button className="btn btn-primary search-btn" onClick={() => handleSearch(query)} disabled={loading} aria-busy={loading}>
+                {loading && <span className="btn-spinner" aria-hidden="true" />}
+                {loading ? "Searching" : "Search"}
               </button>
             </div>
           </div>
@@ -594,6 +643,12 @@ export default function HomePage() {
               ) : (
                 <>
                   Showing <strong>{filteredJobs.length}</strong> of <strong>{formatNumber(jobsData.length)}+</strong> jobs
+                  {loadingMore && (
+                    <span className="results-loading-more">
+                      <span className="btn-spinner" aria-hidden="true" />
+                      Finding more…
+                    </span>
+                  )}
                 </>
               )}
             </div>
